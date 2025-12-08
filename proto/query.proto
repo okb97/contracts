@@ -52,6 +52,7 @@ service CategoryQuery{
 }
 
 service ProductQuery{
+    rpc ListStream(google.protobuf.Empty)   returns (stream Product);
     rpc List(google.protobuf.Empty) returns (ProductsResult);
     rpc ById(ProductParam) returns (ProductResult);
     rpc ByKeyword(ProductParam) returns (ProductsResult);

@@ -160,15 +160,17 @@ var CategoryQuery_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ProductQuery_List_FullMethodName      = "/proto.ProductQuery/List"
-	ProductQuery_ById_FullMethodName      = "/proto.ProductQuery/ById"
-	ProductQuery_ByKeyword_FullMethodName = "/proto.ProductQuery/ByKeyword"
+	ProductQuery_ListStream_FullMethodName = "/proto.ProductQuery/ListStream"
+	ProductQuery_List_FullMethodName       = "/proto.ProductQuery/List"
+	ProductQuery_ById_FullMethodName       = "/proto.ProductQuery/ById"
+	ProductQuery_ByKeyword_FullMethodName  = "/proto.ProductQuery/ByKeyword"
 )
 
 // ProductQueryClient is the client API for ProductQuery service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ProductQueryClient interface {
+	ListStream(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Product], error)
 	List(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ProductsResult, error)
 	ById(ctx context.Context, in *ProductParam, opts ...grpc.CallOption) (*ProductResult, error)
 	ByKeyword(ctx context.Context, in *ProductParam, opts ...grpc.CallOption) (*ProductsResult, error)
@@ -181,6 +183,25 @@ type productQueryClient struct {
 func NewProductQueryClient(cc grpc.ClientConnInterface) ProductQueryClient {
 	return &productQueryClient{cc}
 }
+
+func (c *productQueryClient) ListStream(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Product], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &ProductQuery_ServiceDesc.Streams[0], ProductQuery_ListStream_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[emptypb.Empty, Product]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ProductQuery_ListStreamClient = grpc.ServerStreamingClient[Product]
 
 func (c *productQueryClient) List(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ProductsResult, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -216,6 +237,7 @@ func (c *productQueryClient) ByKeyword(ctx context.Context, in *ProductParam, op
 // All implementations must embed UnimplementedProductQueryServer
 // for forward compatibility.
 type ProductQueryServer interface {
+	ListStream(*emptypb.Empty, grpc.ServerStreamingServer[Product]) error
 	List(context.Context, *emptypb.Empty) (*ProductsResult, error)
 	ById(context.Context, *ProductParam) (*ProductResult, error)
 	ByKeyword(context.Context, *ProductParam) (*ProductsResult, error)
@@ -229,6 +251,9 @@ type ProductQueryServer interface {
 // pointer dereference when methods are called.
 type UnimplementedProductQueryServer struct{}
 
+func (UnimplementedProductQueryServer) ListStream(*emptypb.Empty, grpc.ServerStreamingServer[Product]) error {
+	return status.Error(codes.Unimplemented, "method ListStream not implemented")
+}
 func (UnimplementedProductQueryServer) List(context.Context, *emptypb.Empty) (*ProductsResult, error) {
 	return nil, status.Error(codes.Unimplemented, "method List not implemented")
 }
@@ -258,6 +283,17 @@ func RegisterProductQueryServer(s grpc.ServiceRegistrar, srv ProductQueryServer)
 	}
 	s.RegisterService(&ProductQuery_ServiceDesc, srv)
 }
+
+func _ProductQuery_ListStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(emptypb.Empty)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ProductQueryServer).ListStream(m, &grpc.GenericServerStream[emptypb.Empty, Product]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ProductQuery_ListStreamServer = grpc.ServerStreamingServer[Product]
 
 func _ProductQuery_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
@@ -333,6 +369,12 @@ var ProductQuery_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ProductQuery_ByKeyword_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "ListStream",
+			Handler:       _ProductQuery_ListStream_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "proto/query.proto",
 }
